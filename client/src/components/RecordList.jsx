@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import PropTypes from "prop-types";
 
 function displayLevel(level) {
   if (!level) return "";
@@ -43,6 +44,15 @@ const Record = (props) => (
     </td>
   </tr>
 );
+Record.propTypes = {
+  record: PropTypes.shape({
+    _id: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    position: PropTypes.string.isRequired,
+    level: PropTypes.string,
+  }).isRequired,
+  deleteRecord: PropTypes.func.isRequired,
+};
 
 export default function RecordList() {
   const [records, setRecords] = useState([]);
