@@ -126,3 +126,15 @@ stage('Generate SBOM') {
                          fingerprint: true
     }
 }
+
+stage('OWASP ZAP DAST Scan') {
+    steps {
+        bat '''
+            docker run --rm -t -v "%CD%:/zap/wrk/:rw" ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://host.docker.internal:8081 -r zap-report.html -I
+            if errorlevel 1 exit /b 1
+        '''
+
+        archiveArtifacts artifacts: 'zap-report.html',
+                         fingerprint: true
+    }
+}
