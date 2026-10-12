@@ -42,6 +42,25 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'sonarqube-token',
+                        variable: 'SONAR_TOKEN'
+                    )
+                ]) {
+                    bat '''
+                        sonar-scanner.bat ^
+                          -D"sonar.projectKey=secure-deploy" ^
+                          -D"sonar.sources=." ^
+                          -D"sonar.host.url=http://localhost:9000" ^
+                          -D"sonar.token=%SONAR_TOKEN%"
+                    '''
+                }
+            }
+        }
+
         stage('Gitleaks Secret Scan') {
             steps {
                 bat '''
