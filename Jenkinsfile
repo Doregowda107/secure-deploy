@@ -107,3 +107,22 @@ stage('SonarQube Quality Gate') {
         }
     }
 }
+
+stage('Generate SBOM') {
+    steps {
+        bat '''
+            if not exist sbom mkdir sbom
+
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "%CD%:/src" anchore/syft:latest docker:secure-deploy-frontend:latest -o cyclonedx-json=/src/sbom/frontend-sbom.cdx.json
+
+            if errorlevel 1 exit /b 1
+
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "%CD%:/src" anchore/syft:latest docker:secure-deploy-backend:latest -o cyclonedx-json=/src/sbom/backend-sbom.cdx.json
+
+            if errorlevel 1 exit /b 1
+        '''
+
+        archiveArtifacts artifacts: 'sbom/*.cdx.json',
+                         fingerprint: true
+    }
+}
