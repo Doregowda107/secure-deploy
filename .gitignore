@@ -2,3 +2,22 @@ server/config.env
 server/node_modules/
 client/node_modules/
 client/dist/
+
+# Existing project exclusions
+server/config.env
+server/node_modules/
+client/node_modules/
+client/dist/
+
+# Security scanner output
+.scannerwork/
+
+# Environment files - do not commit secrets
+.env
+.env.*
+config.env
+server/.env
+client/.env
+
+# Generated build output
+dist/
