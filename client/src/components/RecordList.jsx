@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 
@@ -11,28 +11,62 @@ function displayLevel(level) {
   return level;
 }
 
+const LEVEL_STYLES = {
+  Intern: "bg-sky-50 text-sky-700 ring-sky-600/20",
+  Junior: "bg-amber-50 text-amber-700 ring-amber-600/20",
+  Senior: "bg-brand-50 text-brand-700 ring-brand-600/20",
+};
+
+function getInitials(name) {
+  return (name || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+}
+
+function LevelBadge({ level }) {
+  const label = displayLevel(level);
+  if (!label) return <span className="text-slate-400">&mdash;</span>;
+  const style = LEVEL_STYLES[label] || "bg-slate-50 text-slate-600 ring-slate-500/20";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${style}`}
+    >
+      {label}
+    </span>
+  );
+}
+LevelBadge.propTypes = { level: PropTypes.string };
+
 const Record = (props) => (
-  <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-    <td className="p-4 align-middle [&amp;:has([role=checkbox])]:pr-0">
-      {props.record.name}
+  <tr className="transition-colors hover:bg-slate-50">
+    <td className="px-4 py-3 sm:px-6">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700"
+        >
+          {getInitials(props.record.name)}
+        </span>
+        <span className="font-medium text-slate-900">{props.record.name}</span>
+      </div>
     </td>
-    <td className="p-4 align-middle [&amp;:has([role=checkbox])]:pr-0">
-      {props.record.position}
+    <td className="px-4 py-3 text-slate-600 sm:px-6">{props.record.position}</td>
+    <td className="px-4 py-3 sm:px-6">
+      <LevelBadge level={props.record.level} />
     </td>
-    <td className="p-4 align-middle [&amp;:has([role=checkbox])]:pr-0">
-      {displayLevel(props.record.level)}
-    </td>
-    <td className="p-4 align-middle [&amp;:has([role=checkbox])]:pr-0">
-      <div className="flex gap-2">
+    <td className="px-4 py-3 sm:px-6">
+      <div className="flex justify-end gap-2">
         <Link
-          className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-slate-100 h-9 rounded-md px-3"
+          className="btn btn-secondary btn-sm"
           to={`/edit/${props.record._id}`}
         >
           Edit
         </Link>
         <button
-          className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-slate-100 hover:text-accent-foreground h-9 rounded-md px-3"
-          color="red"
+          className="btn btn-danger btn-sm"
           type="button"
           onClick={() => {
             props.deleteRecord(props.record._id);
@@ -54,75 +88,123 @@ Record.propTypes = {
   deleteRecord: PropTypes.func.isRequired,
 };
 
+function LoadingRows() {
+  return Array.from({ length: 4 }).map((_, i) => (
+    <tr key={i}>
+      <td colSpan={4} className="px-4 py-4 sm:px-6">
+        <div className="h-5 animate-pulse rounded bg-slate-100" />
+      </td>
+    </tr>
+  ));
+}
+
 export default function RecordList() {
   const [records, setRecords] = useState([]);
+  const [status, setStatus] = useState("loading"); // loading | ready | error
 
   // This method fetches the records from the database.
-  useEffect(() => {
-    async function getRecords() {
+  const getRecords = useCallback(async () => {
+    setStatus("loading");
+    try {
       const response = await fetch(`/record/`);
       if (!response.ok) {
-        const message = `An error occurred: ${response.statusText}`;
-        console.error(message);
+        console.error(`An error occurred: ${response.statusText}`);
+        setStatus("error");
         return;
       }
-      const records = await response.json();
-      setRecords(records);
+      setRecords(await response.json());
+      setStatus("ready");
+    } catch (error) {
+      console.error("Failed to load records:", error);
+      setStatus("error");
     }
+  }, []);
+
+  useEffect(() => {
     getRecords();
-    return;
-  }, [records.length]);
+  }, [getRecords]);
 
   // This method will delete a record
   async function deleteRecord(id) {
-    await fetch(`/record/${id}`, {
-      method: "DELETE",
-    });
-    const newRecords = records.filter((el) => el._id !== id);
-    setRecords(newRecords);
-  }
-
-  // This method will map out the records on the table
-  function recordList() {
-    return records.map((record) => {
-      return (
-        <Record
-          record={record}
-          deleteRecord={() => deleteRecord(record._id)}
-          key={record._id}
-        />
-      );
-    });
+    try {
+      const response = await fetch(`/record/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        console.error(`Delete failed: ${response.statusText}`);
+        return;
+      }
+      setRecords((prev) => prev.filter((el) => el._id !== id));
+    } catch (error) {
+      console.error("Failed to delete record:", error);
+    }
   }
 
   // This following section will display the table with the records of individuals.
   return (
     <>
-      <h3 className="text-lg font-semibold p-4">Employee Records</h3>
-      <div className="border rounded-lg overflow-hidden">
-        <div className="relative w-full overflow-auto">
-          <table className="w-full caption-bottom text-sm">
-            <thead className="[&amp;_tr]:border-b">
-              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Name
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Position
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Level
-                </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&amp;:has([role=checkbox])]:pr-0">
-                  Action
-                </th>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Employee Records
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Manage your team members, roles and seniority levels.
+          </p>
+        </div>
+        {status === "ready" && (
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-200">
+            {records.length} {records.length === 1 ? "employee" : "employees"}
+          </span>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-medium sm:px-6">Name</th>
+                <th scope="col" className="px-4 py-3 font-medium sm:px-6">Position</th>
+                <th scope="col" className="px-4 py-3 font-medium sm:px-6">Level</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium sm:px-6">Action</th>
               </tr>
             </thead>
-            <tbody className="[&amp;_tr:last-child]:border-0">
-              {recordList()}
+            <tbody className="divide-y divide-slate-100">
+              {status === "loading" && <LoadingRows />}
+              {status === "ready" &&
+                records.map((record) => (
+                  <Record
+                    record={record}
+                    deleteRecord={() => deleteRecord(record._id)}
+                    key={record._id}
+                  />
+                ))}
             </tbody>
           </table>
         </div>
+
+        {status === "ready" && records.length === 0 && (
+          <div className="px-6 py-16 text-center">
+            <p className="font-medium text-slate-900">No employees yet</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Get started by adding your first employee record.
+            </p>
+            <Link to="/create" className="btn btn-primary mt-5">
+              Add employee
+            </Link>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div role="alert" className="px-6 py-16 text-center">
+            <p className="font-medium text-slate-900">Couldn&apos;t load employees</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Please check your connection and try again.
+            </p>
+            <button type="button" className="btn btn-secondary mt-5" onClick={getRecords}>
+              Retry
+            </button>
+          </div>
+        )}
       </div>
     </>
   );
